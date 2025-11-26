@@ -1,8 +1,14 @@
-"""OpenRouter API client for making LLM requests."""
+"""LLM API client for OpenRouter or direct OpenAI based on config."""
 
 import httpx
 from typing import List, Dict, Any, Optional
-from .config import OPENROUTER_API_KEY, OPENROUTER_API_URL
+from .config import (
+    OPENROUTER_API_KEY,
+    OPENROUTER_API_URL,
+    OPENAI_API_KEY,
+    OPENAI_API_URL,
+    LLM_PROVIDER,
+)
 
 
 async def query_model(
@@ -21,20 +27,35 @@ async def query_model(
     Returns:
         Response dict with 'content' and optional 'reasoning_details', or None if failed
     """
+    # Choose provider based on config so no additional API route is required.
+    if LLM_PROVIDER == "openai":
+        api_key = OPENAI_API_KEY
+        api_url = OPENAI_API_URL
+        # OpenAI models are typically named without the "openai/" prefix.
+        model_name = model.split("/", 1)[1] if "/" in model else model
+    else:
+        api_key = OPENROUTER_API_KEY
+        api_url = OPENROUTER_API_URL
+        model_name = model
+
+    if not api_key:
+        print(f"Error querying model {model}: missing API key for {LLM_PROVIDER}")
+        return None
+
     headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
 
     payload = {
-        "model": model,
+        "model": model_name,
         "messages": messages,
     }
 
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.post(
-                OPENROUTER_API_URL,
+                api_url,
                 headers=headers,
                 json=payload
             )
